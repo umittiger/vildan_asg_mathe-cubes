@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASG Laichingen - Würfel-Denkmal 3D-Simulation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    /* Spezial-Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Oberer Titel & ASG Schul-Header mit Logo -->
+  <div class="absolute top-4 left-4 z-10 pointer-events-none">
+    <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/60 p-4 rounded-2xl shadow-2xl max-w-sm pointer-events-auto">
+      
+      <!-- ASG Laichingen Logo & Schulname -->
+      <div class="flex items-center gap-3 pb-3 mb-3 border-b border-slate-800">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-700 via-indigo-500 to-sky-400 flex items-center justify-center shadow-md font-black text-white text-base tracking-tighter shrink-0 border border-indigo-300/30">
+          ASG
+        </div>
+        <div>
+          <a href="https://www.asg-laichingen.de/" target="_blank" rel="noopener noreferrer" class="text-xs font-black tracking-wide text-white hover:text-indigo-300 transition flex items-center gap-1">
+            Albert-Schweitzer-Gymnasium
+            <span class="text-[10px] text-slate-400">↗</span>
+          </a>
+          <span class="text-[10px] font-semibold text-indigo-400 block">Laichingen • Mathe 3D</span>
+        </div>
+      </div>
+
+      <span class="inline-block px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider bg-indigo-500/20 text-indigo-400 rounded-full mb-1">
+        Problem des Monats • 3D-Simulation
+      </span>
+      <h1 class="text-lg md:text-xl font-bold text-white tracking-tight">Das Würfel-Denkmal</h1>
+      <p class="text-xs text-slate-400 mt-1">
+        Linke Maustaste zum Drehen, rechte Maustaste zum Verschieben, Mausrad zum Zoomen.
+      </p>
+    </div>
+  </div>
+
+  <!-- Rechtes Steuerungs-Panel -->
+  <div class="absolute top-4 right-4 z-10 w-80 max-h-[92vh] overflow-y-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/60 p-5 rounded-2xl shadow-2xl flex flex-col gap-4">
+    
+    <!-- Modus-Auswahl (Aufgabe a und b) -->
+    <div>
+      <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">Aufgabenstellung</label>
+      <div class="grid grid-cols-2 gap-2 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
+        <button id="btn-mode-a" class="py-2 px-3 text-xs font-bold rounded-lg transition-all bg-indigo-600 text-white shadow-md">
+          a) 1000 Würfel
+        </button>
+        <button id="btn-mode-b" class="py-2 px-3 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition-all">
+          b) Ummantelung
+        </button>
+      </div>
+    </div>
+
+    <!-- Ansichtsfilter -->
+    <div>
+      <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">Würfelfilter</label>
+      <div class="grid grid-cols-3 gap-1.5">
+        <button id="filter-all" class="filter-btn py-1.5 px-2 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition">
+          Alle
+        </button>
+        <button id="filter-typeA" class="filter-btn py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition">
+          Typ A
+        </button>
+        <button id="filter-typeI" class="filter-btn py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition">
+          Typ I
+        </button>
+      </div>
+    </div>
+
+    <!-- Eckschnitt (Einblick) Toggle -->
+    <div class="flex items-center justify-between bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+      <div class="flex flex-col">
+        <span class="text-xs font-semibold text-slate-200">Eckschnitt (Einblick)</span>
+        <span class="text-[10px] text-slate-400">Öffnet die vordere Ecke für Innenansicht</span>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" id="cutaway-toggle" class="sr-only peer" checked>
+        <div class="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+      </label>
+    </div>
+
+    <!-- Schichten-Schieberegler -->
+    <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-xs font-semibold text-slate-300">Schichthöhe</span>
+        <span id="layer-label" class="text-xs font-mono font-bold text-indigo-400">Alle (10/10)</span>
+      </div>
+      <input id="layer-slider" type="range" min="1" max="10" value="10" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+      <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+        <span>Boden</span>
+        <span>Spitze</span>
+      </div>
+    </div>
+
+    <!-- Mathematische Auswertung & Zählung -->
+    <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+      <h3 class="text-xs font-bold text-slate-200 mb-2.5 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+        Berechnung & Anzahl
+      </h3>
+      
+      <div class="space-y-2 text-xs">
+        <div class="flex justify-between items-center py-1 border-b border-slate-800/80">
+          <span class="flex items-center gap-2 text-slate-400">
+            <span class="w-3 h-3 rounded bg-[#334155] border border-slate-500 inline-block"></span>
+            Typ A (Außen / Witterungsbeständig):
+          </span>
+          <span id="stat-type-a" class="font-mono font-bold text-amber-400 text-sm">424</span>
+        </div>
+        
+        <div class="flex justify-between items-center py-1 border-b border-slate-800/80">
+          <span class="flex items-center gap-2 text-slate-400">
+            <span class="w-3 h-3 rounded bg-[#fcd34d] border border-amber-300 inline-block"></span>
+            Typ I (Innen / Nicht wetterfest):
+          </span>
+          <span id="stat-type-i" class="font-mono font-bold text-indigo-300 text-sm">576</span>
+        </div>
+
+        <div class="flex justify-between items-center pt-1">
+          <span class="text-slate-400">Gesamtzahl der Würfel:</span>
+          <span id="stat-total" class="font-mono font-bold text-white text-sm">1000</span>
+        </div>
+      </div>
+
+      <!-- Lösungserklärung -->
+      <div id="solution-explanation" class="mt-3 pt-3 border-t border-slate-800 text-[11px] leading-relaxed text-slate-400"></div>
+    </div>
+
+    <!-- Kamera zurücksetzen -->
+    <button id="btn-reset-cam" class="w-full py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
+      Kamera zurücksetzen
+    </button>
+  </div>
+
+  <!-- Linker unterer Bereich: Farblegende & 1 bis 10 Kubikzahlen-Tabelle -->
+  <div class="absolute bottom-4 left-4 z-10 flex flex-col gap-2 max-w-sm pointer-events-auto">
+    
+    <!-- 1 den 10 a kadar Küp Sayıları (Kubikzahlen 1³ bis 10³) -->
+    <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/60 p-3 rounded-2xl shadow-xl">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+          <span>🎲</span> Kubikzahlen (1 bis 10)
+        </span>
+        <span class="text-[9px] font-mono text-slate-400">n³ = n × n × n</span>
+      </div>
+      <div class="grid grid-cols-5 gap-1.5 text-center font-mono">
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">1³</span>
+          <span class="text-[11px] font-black text-pink-400">1</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">2³</span>
+          <span class="text-[11px] font-black text-pink-400">8</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">3³</span>
+          <span class="text-[11px] font-black text-pink-400">27</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">4³</span>
+          <span class="text-[11px] font-black text-pink-400">64</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">5³</span>
+          <span class="text-[11px] font-black text-pink-400">125</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">6³</span>
+          <span class="text-[11px] font-black text-cyan-400">216</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">7³</span>
+          <span class="text-[11px] font-black text-cyan-400">343</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">8³</span>
+          <span class="text-[11px] font-black text-cyan-400">512</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">9³</span>
+          <span class="text-[11px] font-black text-cyan-400">729</span>
+        </div>
+        <div class="bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+          <span class="text-[9px] text-slate-400 block">10³</span>
+          <span class="text-[11px] font-black text-amber-300">1000</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Farblegende -->
+    <div class="flex gap-3 text-xs bg-slate-900/80 backdrop-blur border border-slate-700/60 px-4 py-2 rounded-xl">
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded bg-[#334155] border border-slate-400"></span>
+        <span class="text-slate-300">Typ A: Außenflächen</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded bg-[#fcd34d] border border-amber-300"></span>
+        <span class="text-slate-300">Typ I: Innenwürfel & Boden</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Dreidimensionale Szenen-Einrichtung ---
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x090d16);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const initialCamPos = new THREE.Vector3(26, 20, 28);
+    camera.position.copy(initialCamPos);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0, 5, 0);
+
+    // --- Beleuchtung ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(25, 35, 25);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    const fillLight = new THREE.DirectionalLight(0x90b0e0, 0.4);
+    fillLight.position.set(-25, -10, -25);
+    scene.add(fillLight);
+
+    // --- Boden & Raster ---
+    const grid = new THREE.GridHelper(36, 36, 0x4f46e5, 0x1e293b);
+    grid.position.y = -0.5;
+    scene.add(grid);
+
+    const floorGeo = new THREE.PlaneGeometry(80, 80);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x070b13, roughness: 0.9, metalness: 0.1 });
+    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.y = -0.51;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    // --- Status-Variablen ---
+    let currentMode = 'a'; // 'a' oder 'b'
+    let currentFilter = 'all'; // 'all', 'typeA', 'typeI'
+    let isCutawayActive = true;
+    let maxVisibleLayer = 10;
+    let cubeGroup = new THREE.Group();
+    scene.add(cubeGroup);
+
+    // Materialien
+    const cubeGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+    const matTypeA = new THREE.MeshStandardMaterial({
+      color: 0x334155, // Dunkles Schiefergrau
+      roughness: 0.4,
+      metalness: 0.15
+    });
+    const matTypeI = new THREE.MeshStandardMaterial({
+      color: 0xf5d061, // Steingelb
+      roughness: 0.5,
+      metalness: 0.05
+    });
+
+    const dummy = new THREE.Object3D();
+
+    // --- Würfelaufbau mit InstancedMesh ---
+    function buildMonument() {
+      // Vorherige Objekte aufräumen
+      while (cubeGroup.children.length > 0) {
+        const obj = cubeGroup.children[0];
+        cubeGroup.remove(obj);
+      }
+
+      const listA = [];
+      const listI = [];
+
+      if (currentMode === 'a') {
+        // Teil a: Würfel-Denkmal aus 10x10x10 = 1000 Würfeln
+        const sizeX = 10, sizeY = 10, sizeZ = 10;
+        const offsetX = (sizeX - 1) / 2;
+        const offsetZ = (sizeZ - 1) / 2;
+
+        for (let y = 0; y < sizeY; y++) {
+          for (let x = 0; x < sizeX; x++) {
+            for (let z = 0; z < sizeZ; z++) {
+              // Außenseiten und Deckfläche sind Typ A. Der Rest innen ist Typ I.
+              const isOuterSide = (x === 0 || x === sizeX - 1 || z === 0 || z === sizeZ - 1);
+              const isTop = (y === sizeY - 1);
+              const isTypeA = isTop || isOuterSide;
+
+              // Filter
+              if (y >= maxVisibleLayer) continue;
+              if (currentFilter === 'typeA' && !isTypeA) continue;
+              if (currentFilter === 'typeI' && isTypeA) continue;
+
+              // Eckschnitt für Einblick
+              if (isCutawayActive && x >= 5 && z >= 5 && y >= 3) continue;
+
+              const pos = [x - offsetX, y, z - offsetZ];
+              if (isTypeA) listA.push(pos);
+              else listI.push(pos);
+            }
+          }
+        }
+        controls.target.set(0, 4.5, 0);
+
+      } else {
+        // Teil b: Klotzstadt-Ummantelung
+        // Kern: 10x10x10 = 1000 Würfel vom Typ I.
+        // 4 Seitenwände und Deckfläche werden mit Typ A ummantelt:
+        // Neue Dimensionen: Breite: 12 (X: 0..11), Tiefe: 12 (Z: 0..11), Höhe: 11 (Y: 0..10).
+        const sizeX = 12, sizeY = 11, sizeZ = 12;
+        const offsetX = (sizeX - 1) / 2;
+        const offsetZ = (sizeZ - 1) / 2;
+
+        for (let y = 0; y < sizeY; y++) {
+          for (let x = 0; x < sizeX; x++) {
+            for (let z = 0; z < sizeZ; z++) {
+              const isCore = (x >= 1 && x <= 10 && z >= 1 && z <= 10 && y >= 0 && y <= 9);
+              const isTypeA = !isCore;
+
+              // Filter
+              if (y >= maxVisibleLayer) continue;
+              if (currentFilter === 'typeA' && !isTypeA) continue;
+              if (currentFilter === 'typeI' && isTypeA) continue;
+
+              // Eckschnitt
+              if (isCutawayActive && x >= 6 && z >= 6 && y >= 3) continue;
+
+              const pos = [x - offsetX, y, z - offsetZ];
+              if (isTypeA) listA.push(pos);
+              else listI.push(pos);
+            }
+          }
+        }
+        controls.target.set(0, 5, 0);
+      }
+
+      // Typ A InstancedMesh
+      if (listA.length > 0) {
+        const meshA = new THREE.InstancedMesh(cubeGeo, matTypeA, listA.length);
+        meshA.castShadow = true;
+        meshA.receiveShadow = true;
+        for (let i = 0; i < listA.length; i++) {
+          dummy.position.set(listA[i][0], listA[i][1], listA[i][2]);
+          dummy.updateMatrix();
+          meshA.setMatrixAt(i, dummy.matrix);
+        }
+        meshA.instanceMatrix.needsUpdate = true;
+        cubeGroup.add(meshA);
+      }
+
+      // Typ I InstancedMesh
+      if (listI.length > 0) {
+        const meshI = new THREE.InstancedMesh(cubeGeo, matTypeI, listI.length);
+        meshI.castShadow = true;
+        meshI.receiveShadow = true;
+        for (let i = 0; i < listI.length; i++) {
+          dummy.position.set(listI[i][0], listI[i][1], listI[i][2]);
+          dummy.updateMatrix();
+          meshI.setMatrixAt(i, dummy.matrix);
+        }
+        meshI.instanceMatrix.needsUpdate = true;
+        cubeGroup.add(meshI);
+      }
+
+      updateStats();
+    }
+
+    // --- Statistik- und Lösungsanzeige ---
+    function updateStats() {
+      const statA = document.getElementById('stat-type-a');
+      const statI = document.getElementById('stat-type-i');
+      const statTotal = document.getElementById('stat-total');
+      const expl = document.getElementById('solution-explanation');
+
+      if (currentMode === 'a') {
+        statA.innerText = "424";
+        statI.innerText = "576";
+        statTotal.innerText = "1000";
+        expl.innerHTML = `
+          <strong class="text-indigo-300">Lösung zu Teil a:</strong><br>
+          • <strong>Innenblock (Typ I):</strong> Da die Unterseite geschützt ist, reicht der Kern bis zum Boden: 8 × 8 × 9 = <span class="text-amber-400 font-semibold">576</span> Würfel.<br>
+          • <strong>Typ A Würfel:</strong> Gesamt 1000 − 576 = <span class="text-emerald-400 font-bold">424 Stück</span> für die wetterfesten Außenflächen.
+        `;
+      } else {
+        statA.innerText = "584";
+        statI.innerText = "1000";
+        statTotal.innerText = "1584";
+        expl.innerHTML = `
+          <strong class="text-indigo-300">Lösung zu Teil b:</strong><br>
+          • Ursprünglicher Block: 10 × 10 × 10 = 1000 Würfel vom Typ I.<br>
+          • Mit 4 Seiten und Deckschicht neu: <strong>12 × 12 × 11 = 1584</strong> Würfel.<br>
+          • <strong>Zusätzliche Typ-A-Würfel:</strong> 1584 − 1000 = <span class="text-emerald-400 font-bold">584 Stück</span> Außenverkleidung.
+        `;
+      }
+    }
+
+    // --- Event-Listener & Steuerungen ---
+    const btnModeA = document.getElementById('btn-mode-a');
+    const btnModeB = document.getElementById('btn-mode-b');
+    const slider = document.getElementById('layer-slider');
+    const layerLabel = document.getElementById('layer-label');
+
+    btnModeA.addEventListener('click', () => {
+      currentMode = 'a';
+      btnModeA.className = 'py-2 px-3 text-xs font-bold rounded-lg transition-all bg-indigo-600 text-white shadow-md';
+      btnModeB.className = 'py-2 px-3 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition-all';
+      slider.max = 10;
+      slider.value = 10;
+      maxVisibleLayer = 10;
+      layerLabel.innerText = 'Alle (10/10)';
+      buildMonument();
+    });
+
+    btnModeB.addEventListener('click', () => {
+      currentMode = 'b';
+      btnModeB.className = 'py-2 px-3 text-xs font-bold rounded-lg transition-all bg-indigo-600 text-white shadow-md';
+      btnModeA.className = 'py-2 px-3 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition-all';
+      slider.max = 11;
+      slider.value = 11;
+      maxVisibleLayer = 11;
+      layerLabel.innerText = 'Alle (11/11)';
+      buildMonument();
+    });
+
+    // Filter-Buttons (Alle, Typ A, Typ I)
+    const filterButtons = {
+      'filter-all': 'all',
+      'filter-typeA': 'typeA',
+      'filter-typeI': 'typeI'
+    };
+
+    Object.keys(filterButtons).forEach(id => {
+      document.getElementById(id).addEventListener('click', (e) => {
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+          btn.className = 'filter-btn py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition';
+        });
+        e.target.className = 'filter-btn py-1.5 px-2 text-xs font-semibold rounded-lg bg-indigo-600 text-white transition';
+        currentFilter = filterButtons[id];
+        buildMonument();
+      });
+    });
+
+    // Eckschnitt Toggle
+    const cutawayToggle = document.getElementById('cutaway-toggle');
+    cutawayToggle.addEventListener('change', (e) => {
+      isCutawayActive = e.target.checked;
+      buildMonument();
+    });
+
+    // Schichten-Schieberegler
+    slider.addEventListener('input', (e) => {
+      maxVisibleLayer = parseInt(e.target.value);
+      const maxVal = slider.max;
+      layerLabel.innerText = maxVisibleLayer === parseInt(maxVal) ? `Alle (${maxVal}/${maxVal})` : `Bis Schicht ${maxVisibleLayer}`;
+      buildMonument();
+    });
+
+    // Kamera Reset
+    document.getElementById('btn-reset-cam').addEventListener('click', () => {
+      camera.position.copy(initialCamPos);
+      controls.target.set(0, currentMode === 'a' ? 4.5 : 5, 0);
+    });
+
+    // Größenanpassung
+    window.addEventListener('resize', onWindowResize, false);
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- Render-Schleife ---
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.onload = function() {
+      buildMonument();
+      animate();
+    };
+  </script>
+</body>
+</html>
